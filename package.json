@@ -1,0 +1,25 @@
+{
+  "name": "json-opticon",
+  "version": "1.0.0",
+  "main": "updateFridgeProducts.js",
+  "bin": {
+    "execute": "updateFridgeProducts.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "NODE_TLS_REJECT_UNAUTHORIZED='0' node ./updateFridgeProducts.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "express": "^4.18.1",
+    "fs": "^0.0.1-security",
+    "node-fetch": "^3.2.10",
+    "pkg": "^5.8.0",
+    "request": "^2.88.2",
+    "request-promise": "^4.2.6"
+  },
+  "devDependencies": {},
+  "description": ""
+}
