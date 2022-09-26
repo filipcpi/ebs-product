@@ -3,17 +3,19 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const axios = require('axios');
 var fs = require('fs');
 
-var user = "admin_CPI"
-var password = "adminCPI"
+var config = JSON.parse(fs.readFileSync("./config.json"));
+
+//var user = "admin_CPI"
+//var password = "adminCPI"
 var products = ""
 
 async function getTest() {
     console.log("getTest")
 
-    const res = await axios.get('https://debian.local:18443/esls', {
+    const res = await axios.get(config["esl"]["api"]+"/esls", {
         auth: {
-            username: user,
-            password: password
+            username: config["esl"]["username"],
+            password: config["esl"]["password"]
         }
     })
     .then(function ok(jsonData) {
@@ -30,14 +32,15 @@ async function getTest() {
 async function getFridges() {
     console.log("get fridges")
 
-    var config = JSON.parse(fs.readFileSync("/home/"+require("os").userInfo().username+"/.config/rfridge.fridge/config.json"));
-    console.log(config["apiKey"]);
+    let file = config["rfridge"]["config"]
+    var configRfridge = JSON.parse(fs.readFileSync(file));
+    console.log(configRfridge["apiKey"]);
 
     const fridge = axios({
         method: 'get',
-        url: 'https://staging.rfridge.fr:8443/fridges',
+        url: config["rfridge"]["api"]+'/fridges',
         headers: { 
-            "x-api-key": config["apiKey"]
+            "x-api-key": configRfridge["apiKey"]
         }
     })
     .then(function ok(jsonFridge) {
@@ -51,52 +54,57 @@ async function getFridges() {
     });
 }
 
-async function getESLProductsOfPlano() {
+ function getProductsFromEBS() {
 
-    //var base64encodedData = Buffer.from(user + ':' + password).toString('base64');
+    let result;
+    
+    console.log("getProductsFromEBS")
+    console.log(config["ebs"]["api"]+'Products');
 
-    console.log("getESLProductsOfPlano")
-
-    const res = await axios({
+    return  axios({
         method: 'get',
-        url: 'https://192.168.1.210/api/Products',
+        url: config["ebs"]["api"]+'Products',
         headers: { 
-            "x-api-key": "DDDB29C5-3DD0-4F71-8E1B-C737D9328BF6"
+            "x-api-key": config["ebs"]["apikey"]
         }
     })
     .then(function ok(jsonData) {
-        console.log("getESLProductsOfPlano: get ebs data: " +  JSON.stringify(jsonData.data))
-        let i = 0;
-        let arraytmp = []
-        /*jsonData.data.forEach(element => {
+        console.log("getProductsFromEBS: get ebs data: " +  JSON.stringify(jsonData.data))
+        
+        result = jsonData.data
+        return result
+
+        /*
+        
+        jsonData.data.forEach(element => {
             arraytmp[0] = element
             console.log(i)
             console.log(JSON.stringify(element))
             
             deleteEBSProducts(arraytmp, i)
             i++
-        });*/
+        });
+        */
     })
     .catch(function fail(error) {
-        console.log("getESLProductsOfPlano error: " + error)
+        console.log("getProductsFromEBS error: " + error)
     });
 }
 
 
 async function postEBSProducts() {
 
-    var base64encodedData = Buffer.from(user + ':' + password).toString('base64');
+    console.log("getProductsFromEBS")
 
-    console.log("getESLProductsOfPlano")
-
-    var config = JSON.parse(fs.readFileSync("/home/"+require("os").userInfo().username+"/.config/rfridge.fridge/config.json"));
-    console.log(config["apiKey"]);
+    let file = config["rfridge"]["config"]
+    var configRfridge = JSON.parse(fs.readFileSync(file));
+    console.log(configRfridge["apiKey"]);
 
     const fridge = axios({
         method: 'get',
-        url: 'https://staging.rfridge.fr:8443/fridges',
+        url: config["rfridge"]["api"]+'fridges',
         headers: { 
-            "x-api-key": config["apiKey"]
+            "x-api-key": configRfridge["apiKey"]
         }
     })
     .then(function ok(jsonFridge) {
@@ -104,10 +112,10 @@ async function postEBSProducts() {
         let idFridge = jsonFridge.data[0]["id"]
         console.log("get id: " +  JSON.stringify(idFridge))
 
-        const res = axios.get('https://debian.local:18443/exportJSON/'+idFridge, {
+        const res = axios.get(config["esl"]["api"]+'exportJSON/'+idFridge, {
         auth: {
-            username: user,
-            password: password
+            username: config["esl"]["username"],
+            password: config["esl"]["password"]
         }
         })
         .then(function ok(jsonData) {
@@ -115,10 +123,10 @@ async function postEBSProducts() {
             console.log("postEBSProducts");
             const res2 = axios({
                 method: 'post',
-                url: 'https://192.168.1.210/api/Products',
+                url: config["ebs"]["api"]+'Products',
                 data: jsonData.data,
                 headers: { 
-                    "x-api-key": "DDDB29C5-3DD0-4F71-8E1B-C737D9328BF6"
+                    "x-api-key": config["ebs"]["apikey"]
                 }
             })
             .then(function ok(jsonData2) {
@@ -126,7 +134,7 @@ async function postEBSProducts() {
                 
             })
             .catch(function fail(error) {
-                console.log(error)
+                console.log("error post ebs products")
             });
         })
         .catch(function fail(error) {
@@ -142,52 +150,69 @@ async function postEBSProducts() {
 
 async function deleteEBSProducts(jsonData, i) {
 
-    if (jsonData)
-    console.log("deleteEBSProducts");
-    const res = await axios({
-        method: 'delete',
-        url: 'https://192.168.1.210/api/Products',
-        headers: { 
-            "x-api-key": "DDDB29C5-3DD0-4F71-8E1B-C737D9328BF6"
-        },
-        data: jsonData
-    })
-    .then(function ok(jsonData) {
-        console.log(i + " / delete ebs data: " +  JSON.stringify(jsonData.data))
-    })
-    .catch(function fail(error) {
-        console.log(error)
-        if (jsonData.length != 0) {
-            getESLProductsOfPlano()
-        }
-    });
-}
+    if (jsonData) {
+        console.log("deleteEBSProducts");
 
-/*
-async function test() {
-
-    const res = await axios.get('https://httpbin.org/basic-auth/foo/bar', {
-        // Axios looks for the `auth` option, and, if it is set, formats a
-        // basic auth header for you automatically.
-        auth: {
-            username: 'foo',
-            password: 'bar'
-        }
-    })
-    .then(function ok(jsonData) {
-        console.log("test: test esls");
-        console.log(jsonData.data);
-        console.log("test: end test esls");
+        const res = await axios({
+            method: 'delete',
+            url: config["ebs"]["api"]+'Products',
+            headers: { 
+                "x-api-key": config["ebs"]["apikey"]
+            },
+            data: jsonData
         })
-    .catch(function fail(error) {
-        console.log("test:  error ////");
-        console.log(error)
-    });
+        .then(function ok(jsonData) {
+            console.log(i + " / delete ebs data: " +  JSON.stringify(jsonData.data))
+        })
+        .catch(function fail(error) {
+            console.log(error)
+            if (jsonData.length != 0) {
+                deleteEBSProducts()
+            }
+        });
+    } else {
+        console.log("no data to delete");
+    }
 }
-*/
-//test()
 
-getTest()
-getESLProductsOfPlano()
-getFridges()
-postEBSProducts()
+
+//getTest()
+async function main() {
+    let results;
+    console.log("--- partie 1 ---");
+
+    results = await getProductsFromEBS()
+    console.log("--- partie 2 ---");
+
+    console.log("resultat : " + JSON.stringify(results));
+    console.log("--- partie 3 ---");
+
+    let i = 0;
+    let arraytmp = []
+    let j = 0;
+
+    // vérifier si il y a des produits apres suppression
+
+    while (typeof results !== 'undefined' && results.length > 0) { // en cas de bug de l'api delete
+        
+        i=0;
+        for (const result of results) {
+            arraytmp[0] = result
+            console.log(i)
+            console.log(JSON.stringify(result))
+            
+            await deleteEBSProducts(arraytmp, i)
+            i++
+        }
+        results = await getProductsFromEBS()
+        j++;
+
+    }
+    console.log("combien de tour: " + j);
+
+    console.log("--- partie 4 ---");
+
+    postEBSProducts()
+}
+
+main()

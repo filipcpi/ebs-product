@@ -1,28 +1,15 @@
 {
-	"apiKey": "UsNF.LvZ468aDPZbQPUkg08JXxy3~HBU",
-	"hostname": "staging.rfridge.fr",
-	"settings": {
-		"locale": "fr",
-		"preset": "2022-04",
-		"temperatureRange": [
-			-2,
-			0,
-			7,
-			9
-		],
-		"port": 20001
+	"rfridge": {
+		"api": "https://staging.rfridge.fr:8443/",
+		"config": "/home/alves/.config/rfridge.fridge/config.json"
 	},
-	"virtualEpcs": {
-		"in": [
-			"F00000000000000000001111",
-			"F00000000000000000002222",
-			"F00000000000000000003333",
-			"F00000000000000000004444",
-			"F00000000000000000005555"
-		],
-		"out": [
-			"F00000000000000000006666",
-			"F00000000000000000007777"
-		]
+	"ebs": {
+		"api": "https://192.168.1.210/api/",
+		"apikey": "DDDB29C5-3DD0-4F71-8E1B-C737D9328BF6"
+	},
+	"esl": {
+		"api": "https://debian.local:18443/",
+		"username": "admin_CPI",
+		"password": "adminCPI"
 	}
 }
