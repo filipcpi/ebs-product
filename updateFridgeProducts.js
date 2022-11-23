@@ -10,110 +10,10 @@ var config = JSON.parse(fs.readFileSync("./config.json"));
 
 var products = ""
 
-function equals( x, y ) {
-    // If both x and y are null or undefined and exactly the same
-    if ( x === y ) {
-        return true;
-    }
-
-    // If they are not strictly equal, they both need to be Objects
-    if ( ! ( x instanceof Object ) || ! ( y instanceof Object ) ) {
-        return false;
-    }
-
-    // They must have the exact same prototype chain, the closest we can do is
-    // test the constructor.
-    if ( x.constructor !== y.constructor ) {
-        return false;
-    }
-
-    for ( var p in x ) {
-        // Inherited properties were tested using x.constructor === y.constructor
-        if ( x.hasOwnProperty( p ) ) {
-            // Allows comparing x[ p ] and y[ p ] when set to undefined
-            if ( ! y.hasOwnProperty( p ) ) {
-                return false;
-            }
-
-            // If they have the same strict value or identity then they are equal
-            if ( x[ p ] === y[ p ] ) {
-                continue;
-            }
-
-            // Numbers, Strings, Functions, Booleans must be strictly equal
-            if ( typeof( x[ p ] ) !== "object" ) {
-                return false;
-            }
-
-            // Objects and Arrays must be tested recursively
-            if ( !equals( x[ p ],  y[ p ] ) ) {
-                return false;
-            }
-        }
-    }
-
-    for ( p in y ) {
-        // allows x[ p ] to be set to undefined
-        if ( y.hasOwnProperty( p ) && ! x.hasOwnProperty( p ) ) {
-            return false;
-        }
-    }
-    return true;
-}
-
-async function getTest() {
-    console.log("getTest")
-
-    const res = await axios.get(config["esl"]["api"]+"/esls", {
-        auth: {
-            username: config["esl"]["username"],
-            password: config["esl"]["password"]
-        }
-    })
-    .then(function ok(jsonData) {
-        console.log("getTest: test esls");
-        console.log(jsonData.data);
-        console.log("getTest: end test esls");
-        })
-    .catch(function fail(error) {
-        console.log("getTest:  error ////");
-        console.log(error)
-    });
-}
-
-//getTest()
-
-async function getFridges() {
-    console.log("get fridges")
-
-    let file = config["rfridge"]["config"]
-    var configRfridge = JSON.parse(fs.readFileSync(file));
-    console.log(configRfridge["apiKey"]);
-
-    const fridge = axios({
-        method: 'get',
-        url: config["rfridge"]["api"]+'/fridges',
-        headers: { 
-            "x-api-key": configRfridge["apiKey"]
-        }
-    })
-    .then(function ok(jsonFridge) {
-        console.log("getFridges: get fridge data: " +  JSON.stringify(jsonFridge.data))
-        let idFridge = jsonFridge.data[0]["id"]
-        console.log("getFridges: get id: " +  JSON.stringify(idFridge))
-
-        })
-    .catch(function fail(error) {
-        console.log(error)
-    });
-}
-
- function getProductsFromEBS() {
+function getProductsFromEBS() {
 
     let result;
     
-    console.log("getProductsFromEBS")
-    //console.log(config["ebs"]["api"]+'Products');
 
     return  axios({
         method: 'get',
@@ -123,8 +23,6 @@ async function getFridges() {
         }
     })
     .then(function ok(jsonData) {
-        console.log("getProductsFromEBS: get ebs data: " +  JSON.stringify(jsonData.data))
-        
         result = jsonData.data
         return result
 
@@ -136,11 +34,8 @@ async function getFridges() {
 
 async function postEBSProducts() {
 
-    console.log("getProductsFromEBS")
-
     let file = config["rfridge"]["config"]
     var configRfridge = JSON.parse(fs.readFileSync(file));
-    console.log(configRfridge["apiKey"]);
 
     const fridge = axios({
         method: 'get',
@@ -150,7 +45,6 @@ async function postEBSProducts() {
         }
     })
     .then(function ok(jsonFridge) {
-        console.log("get fridge data: " +  JSON.stringify(jsonFridge.data))
         let idFridge = jsonFridge.data[0]["id"]
         console.log("get id: " +  JSON.stringify(idFridge))
 
@@ -233,29 +127,6 @@ async function getExportJsonFridge(fridgeId) {
     }
 }
 
-function getPlanogramDataActiveForThisFridge() {
-    let file = config["rfridge"]["config"];
-    var configRfridge = JSON.parse(fs.readFileSync(file));
-
-    const fridge = axios({
-        method: 'get',
-        url: config["rfridge"]["api"]+'fridges',
-        headers: { 
-            "x-api-key": configRfridge["apiKey"]
-        }
-    })
-    .then((jsonFridge) => {
-        console.log("fonctionne");
-        //return "fonctionne"
-        return getExportJsonFridge(jsonFridge)
-    })
-    .catch(function fail(error) {
-        console.log("error")
-        return "error";
-    });
-    return "error";
-}
-
 function getFridgeId() {
     let file = config["rfridge"]["config"];
     var configRfridge = JSON.parse(fs.readFileSync(file));
@@ -277,6 +148,7 @@ async function main() {
     let fridgeId;
     let resultEBS;
     let result;
+
     try {
         result = await getFridgeId();
         fridgeId = result[0]["id"];
@@ -284,7 +156,6 @@ async function main() {
         exit(1);
     }
     console.log("fridgeId: " + fridgeId);
-    //exit(0)
 
     resultEBS = await getProductsFromEBS()
     //resultEBS = JSON.stringify(resultEBS)
@@ -299,12 +170,6 @@ async function main() {
     console.log("--- partie 1 ---");
     results = await getExportJsonFridge(fridgeId);
     console.log("--- partie 2 ---");
-
-    //console.log("resultat export json : " + results);
-    //console.log("--------------------------");
-    //console.log("result EBS: " + resultEBS);
-
-    //if (results == "problem") return;
     
     fs.writeFileSync("./dataProducts.json", results);
     jsonDataProducts = JSON.parse(fs.readFileSync("./dataProducts.json"));
