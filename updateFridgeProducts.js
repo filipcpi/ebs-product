@@ -11,10 +11,11 @@ var config = JSON.parse(fs.readFileSync("./config.json"));
 var products = ""
 
 function getProductsFromEBS() {
-
     let result;
-    
-
+    /*axios.get(config["ebs"]["api"]+'Products', {
+        headers: { 
+        "x-api-key": config["ebs"]["apikey"]
+    }})*/
     return  axios({
         method: 'get',
         url: config["ebs"]["api"]+'Products',
@@ -24,11 +25,8 @@ function getProductsFromEBS() {
     })
     .then(function ok(jsonData) {
         result = jsonData.data
-        return result
 
-    })
-    .catch(function fail(error) {
-        console.log("getProductsFromEBS error: " + error)
+        return result
     });
 }
 
@@ -111,27 +109,22 @@ async function deleteEBSProducts(jsonData) {
     }
 }
 
-async function getExportJsonFridge(fridgeId) {
-    try {
-        const res = await axios.get(config["esl"]["api"]+'exportJSON/'+fridgeId, {
-            auth: {
-                username: config["esl"]["username"],
-                password: config["esl"]["password"]
-            }
-            
-            })
-            return JSON.stringify(res.data);
-    } catch (error) {
-        console.log("erro export: " + error);
-        exit(1);
-    }
+function getExportJsonFridge(fridgeId) {
+    
+    return axios.get(config["esl"]["api"]+'exportJSON/'+fridgeId, {
+        auth: {
+            username: config["esl"]["username"],
+            password: config["esl"]["password"]
+        }
+        
+    })
+    .then((response) => JSON.stringify(response.data));
+
 }
 
 function getFridgeId() {
     let file = config["rfridge"]["config"];
     var configRfridge = JSON.parse(fs.readFileSync(file));
-
-    console.log("getFridgeId");
 
     return axios.get(config["rfridge"]["api"]+'fridges', {
         headers: { 
@@ -167,14 +160,16 @@ async function main() {
     3) postEBSProducts créer les nouveaux produits présent dans l'ESL exportJSON 
     */
 
-    console.log("--- partie 1 ---");
-    results = await getExportJsonFridge(fridgeId);
-    console.log("--- partie 2 ---");
+    try {
+        results = await getExportJsonFridge(fridgeId);
+    } catch (error) {
+        exit(1)
+    }
     
     fs.writeFileSync("./dataProducts.json", results);
     jsonDataProducts = JSON.parse(fs.readFileSync("./dataProducts.json"));
     
-    console.log("--- partie 3 ---");
+    console.log("--- partie 2 ---");
     //console.log("data products");
     console.log(JSON.stringify(jsonDataProducts));
     console.log(JSON.stringify(resultEBS));
