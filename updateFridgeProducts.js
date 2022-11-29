@@ -11,83 +11,31 @@ var config = JSON.parse(fs.readFileSync("./config.json"));
 var products = ""
 
 function getProductsFromEBS() {
-    let result;
-    /*axios.get(config["ebs"]["api"]+'Products', {
+    return axios.get(config["ebs"]["api"]+'Products', {
         headers: { 
         "x-api-key": config["ebs"]["apikey"]
-    }})*/
-    return  axios({
-        method: 'get',
-        url: config["ebs"]["api"]+'Products',
-        headers: { 
-            "x-api-key": config["ebs"]["apikey"]
-        }
-    })
-    .then(function ok(jsonData) {
-        result = jsonData.data
-
-        return result
-    });
-}
-
-async function postEBSProducts() {
-
-    let file = config["rfridge"]["config"]
-    var configRfridge = JSON.parse(fs.readFileSync(file));
-
-    const fridge = axios({
-        method: 'get',
-        url: config["rfridge"]["api"]+'fridges',
-        headers: { 
-            "x-api-key": configRfridge["apiKey"]
-        }
-    })
-    .then(function ok(jsonFridge) {
-        let idFridge = jsonFridge.data[0]["id"]
-        console.log("get id: " +  JSON.stringify(idFridge))
-
-        const res = axios.get(config["esl"]["api"]+'exportJSON/'+idFridge, {
-        auth: {
-            username: config["esl"]["username"],
-            password: config["esl"]["password"]
-        }
-        })
-        .then(function ok(jsonData) {
-            console.log("get products: " +  JSON.stringify(jsonData.data))
-            console.log("postEBSProducts");
-            const res2 = axios({
-                method: 'post',
-                url: config["ebs"]["api"]+'Products',
-                data: jsonData.data,
-                headers: { 
-                    "x-api-key": config["ebs"]["apikey"]
-                }
-            })
-            .then(function ok(jsonData2) {
-                console.log("post ebs data: " +  JSON.stringify(jsonData2.data))
-                
-            })
-            .catch(function fail(error) {
-                console.log("error post ebs products")
-            });
-        })
-        .catch(function fail(error) {
-            console.log("bad export json (get planograms id n'a pas fonctionné) ///// " + error + " ///// ")
-        });
-        })
-    .catch(function fail(error) {
-        console.log(error)
-    });
-
+    }}).then((response) => response.data);
     
 }
 
-async function deleteEBSProducts(jsonData) {
+function postEBSProducts(jsonData) {
 
+    return axios({
+        method: 'post',
+        url: config["ebs"]["api"]+'Products',
+        data: jsonData,
+        headers: { 
+            "x-api-key": config["ebs"]["apikey"],
+            'Content-Type': 'application/json; charset=utf-8'
+        }
+    })
+    .then((response) => response)
+}
+
+function deleteEBSProducts(jsonData) {
     if (jsonData) {
-        console.log("deleteEBSProducts");
 
-        const res = await axios({
+        return axios({
             method: 'delete',
             url: config["ebs"]["api"]+'Products',
             headers: { 
@@ -95,12 +43,13 @@ async function deleteEBSProducts(jsonData) {
             },
             data: jsonData
         })
-        .then(function ok(jsonData) {
+        .then((jsonData) => {
             console.log("delete ebs data: " +  JSON.stringify(jsonData.data))
         })
-        .catch(function fail(error) {
+        .catch((error) => {
             console.log(error)
             if (jsonData.length != 0) {
+                console.log("jsonData.length != 0");
                 deleteEBSProducts()
             }
         });
@@ -134,24 +83,23 @@ function getFridgeId() {
     .then((response) => response.data);
 }
 
-//return result.data[0]["id"];
 async function main() {
 
-    let results;
+    let resultOfExportJson;
     let fridgeId;
     let resultEBS;
-    let result;
+    let resultFridge;
+    let resultPost;
 
     try {
-        result = await getFridgeId();
-        fridgeId = result[0]["id"];
+        resultFridge = await getFridgeId();
+        fridgeId = resultFridge[0]["id"];
     } catch (error) {
         exit(1);
     }
     console.log("fridgeId: " + fridgeId);
 
     resultEBS = await getProductsFromEBS()
-    //resultEBS = JSON.stringify(resultEBS)
     
     /*
     1) getProductsFromEBS recup products from EBS (fridge) https://192.168.1.210/api/
@@ -161,28 +109,21 @@ async function main() {
     */
 
     try {
-        results = await getExportJsonFridge(fridgeId);
+        resultOfExportJson = await getExportJsonFridge(fridgeId);
     } catch (error) {
         exit(1)
     }
     
-    fs.writeFileSync("./dataProducts.json", results);
+    fs.writeFileSync("./dataProducts.json", resultOfExportJson);
     jsonDataProducts = JSON.parse(fs.readFileSync("./dataProducts.json"));
     
     console.log("--- partie 2 ---");
-    //console.log("data products");
     console.log(JSON.stringify(jsonDataProducts));
     console.log(JSON.stringify(resultEBS));
-
-    //exit(0)
-    
-    //console.log(_.isEqual(JSON.stringify(jsonDataProducts), JSON.stringify(resultEBS)));
-    
 
     if (!_.isEqual(jsonDataProducts, resultEBS)) {
         console.log("json différent donc mise à jour");
 
-        
         let i = 0;
         let arraytmp = []
 
@@ -192,26 +133,28 @@ async function main() {
             console.log("pas supprimer");
         }
 
-        // vérifier si il y a des produits apres suppression
         while (typeof resultEBS !== 'undefined' && resultEBS.length > 0) { // en cas de bug de l'api delete 
-            i = 0;
             for (const result of resultEBS) {
                 arraytmp[0] = result
                 console.log("result: " + JSON.stringify(result))
-
-                console.log("tour: " + i);
                 
-                await deleteEBSProducts(arraytmp)
-                i++
+                try {
+                    resultPost = await deleteEBSProducts(arraytmp)
+                } catch (error) {
+                    console.log("error: ", error.response.data.title , error.response.data.status);
+                    exit(1)
+                }
             }
             resultEBS = await getProductsFromEBS()
-            console.log("resultEBS: ", resultEBS);
+            console.log("resultEBS: ", JSON.stringify(resultEBS));
         }
-
-        console.log("--- partie 4 ---");
-        postEBSProducts()
-        
-        
+        console.log("--- partie 4 - POST ---");
+        try {
+            resultPost = await postEBSProducts(resultOfExportJson)
+        } catch (error) {
+            console.log("error: ", error.response.data.title , error.response.data.status);
+            exit(1)
+        }
     } else {
         console.log("json équivalent pas besoin de mettre à jour");
     }
