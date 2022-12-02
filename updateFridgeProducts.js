@@ -49,7 +49,6 @@ function deleteEBSProducts(jsonData) {
         .catch((error) => {
             console.log(error)
             if (jsonData.length != 0) {
-                console.log("jsonData.length != 0");
                 deleteEBSProducts()
             }
         });
@@ -74,6 +73,7 @@ function getExportJsonFridge(fridgeId) {
 function getFridgeId() {
     let file = config["rfridge"]["config"];
     var configRfridge = JSON.parse(fs.readFileSync(file));
+    
 
     return axios.get(config["rfridge"]["api"]+'fridges', {
         headers: { 
@@ -90,14 +90,17 @@ async function main() {
     let resultEBS;
     let resultFridge;
     let resultPost;
+    
+    let file = config["rfridge"]["config"];
+    var configRfridge = JSON.parse(fs.readFileSync(file));
 
     try {
         resultFridge = await getFridgeId();
         fridgeId = resultFridge[0]["id"];
     } catch (error) {
+        console.log(error);
         exit(1);
     }
-    console.log("fridgeId: " + fridgeId);
 
     resultEBS = await getProductsFromEBS()
     
@@ -117,42 +120,29 @@ async function main() {
     fs.writeFileSync("./dataProducts.json", resultOfExportJson);
     jsonDataProducts = JSON.parse(fs.readFileSync("./dataProducts.json"));
     
-    console.log("--- partie 2 ---");
     console.log(JSON.stringify(jsonDataProducts));
     console.log(JSON.stringify(resultEBS));
 
     if (!_.isEqual(jsonDataProducts, resultEBS)) {
-        console.log("json différent donc mise à jour");
 
         let i = 0;
         let arraytmp = []
 
-        if(typeof resultEBS !== 'undefined' && resultEBS.length > 0) {
-            console.log("va etre supprimer");
-        } else {
-            console.log("pas supprimer");
-        }
-
         while (typeof resultEBS !== 'undefined' && resultEBS.length > 0) { // en cas de bug de l'api delete 
             for (const result of resultEBS) {
                 arraytmp[0] = result
-                console.log("result: " + JSON.stringify(result))
                 
                 try {
                     resultPost = await deleteEBSProducts(arraytmp)
                 } catch (error) {
-                    console.log("error: ", error.response.data.title , error.response.data.status);
                     exit(1)
                 }
             }
             resultEBS = await getProductsFromEBS()
-            console.log("resultEBS: ", JSON.stringify(resultEBS));
         }
-        console.log("--- partie 4 - POST ---");
         try {
             resultPost = await postEBSProducts(resultOfExportJson)
         } catch (error) {
-            console.log("error: ", error.response.data.title , error.response.data.status);
             exit(1)
         }
     } else {
