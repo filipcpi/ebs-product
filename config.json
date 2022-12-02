@@ -1,14 +1,14 @@
 {
 	"rfridge": {
 		"api": "https://staging.rfridge.fr:8443/",
-		"config": "/home/alves/.config/rfridge.fridge/config.json"
+		"config": "/home/pi/.config/rfridge.fridge/config.json"
 	},
 	"ebs": {
 		"api": "https://192.168.1.210/api/",
 		"apikey": "DDDB29C5-3DD0-4F71-8E1B-C737D9328BF6"
 	},
 	"esl": {
-		"api": "https://debian.local:18443/",
+		"api": "https://staging.esl.rfridge.fr/",
 		"username": "admin_CPI",
 		"password": "adminCPI"
 	}
