@@ -1,153 +1,109 @@
 #!/usr/bin/env node
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const axios = require('axios');
-var fs = require('fs');
+const fs = require('fs');
 const { exit } = require('process');
-var _ = require('underscore');
-var jsonDataProducts = require('./dataProducts.json')
-
-var config = JSON.parse(fs.readFileSync("./config.json"));
-
-var products = ""
-
-function getProductsFromEBS() {
-    return axios.get(config["ebs"]["api"]+'Products', {
-        headers: { 
-        "x-api-key": config["ebs"]["apikey"]
-    }}).then((response) => response.data);
-    
-}
-
-function postEBSProducts(jsonData) {
-
-    return axios({
-        method: 'post',
-        url: config["ebs"]["api"]+'Products',
-        data: jsonData,
-        headers: { 
-            "x-api-key": config["ebs"]["apikey"],
-            'Content-Type': 'application/json; charset=utf-8'
-        }
-    })
-    .then((response) => response)
-}
-
-function deleteEBSProducts(jsonData) {
-    if (jsonData) {
-
-        return axios({
-            method: 'delete',
-            url: config["ebs"]["api"]+'Products',
-            headers: { 
-                "x-api-key": config["ebs"]["apikey"]
-            },
-            data: jsonData
-        })
-        .then((jsonData) => {
-            console.log("delete ebs data: " +  JSON.stringify(jsonData.data))
-        })
-        .catch((error) => {
-            console.log(error)
-            if (jsonData.length != 0) {
-                deleteEBSProducts()
-            }
-        });
-    } else {
-        console.log("no data to delete");
-    }
-}
-
-function getExportJsonFridge(fridgeId) {
-    
-    return axios.get(config["esl"]["api"]+'exportJSON/'+fridgeId, {
-        auth: {
-            username: config["esl"]["username"],
-            password: config["esl"]["password"]
-        }
-        
-    })
-    .then((response) => JSON.stringify(response.data));
-
-}
-
-function getFridgeId() {
-    let file = config["rfridge"]["config"];
-    var configRfridge = JSON.parse(fs.readFileSync(file));
-    
-
-    return axios.get(config["rfridge"]["api"]+'fridges', {
-        headers: { 
-            "x-api-key": configRfridge["apiKey"]
-        },
-    })
-    .then((response) => response.data);
-}
+const _ = require('underscore');
+const config = JSON.parse(fs.readFileSync("./config.json"));
+const configRfridge = JSON.parse(fs.readFileSync('/home/pi/.config/rfridge.fridge/config.json'));
 
 async function main() {
+    const urlRfridgeApi = config["rfridge"]["api"];
+    const aPiKeyRfridge = { "x-api-key": configRfridge["apiKey"] };
 
-    let resultOfExportJson;
+    const urlProtoApi = config["esl"]["api"] + 'currentPlanogram/';
+    const authProtoApi = { username: config["esl"]["username"], password: config["esl"]["password"] };
+
+    const urlEbsApi = config["ebs"]["api"] + 'Products/';
+    const aPiKeyEbs = { "x-api-key": config["ebs"]["apikey"] };
+
+    let currentPlanogram;
     let fridgeId;
     let resultEBS;
     let resultFridge;
-    let resultPost;
-    
-    let file = config["rfridge"]["config"];
-    var configRfridge = JSON.parse(fs.readFileSync(file));
 
     try {
-        resultFridge = await getFridgeId();
+        resultFridge = await httpRequest(urlRfridgeApi + 'fridges', 'get', null, aPiKeyRfridge, null);
         fridgeId = resultFridge[0]["id"];
+
+        resultEBS = await httpRequest(urlEbsApi, 'get', null, aPiKeyEbs, null);
+        currentPlanogram = await httpRequest(urlProtoApi + fridgeId, 'get', null, null, authProtoApi);
     } catch (error) {
         console.log(error);
         exit(1);
     }
 
-    resultEBS = await getProductsFromEBS()
-    
-    /*
-    1) getProductsFromEBS recup products from EBS (fridge) https://192.168.1.210/api/
-    1.a) vérif données de getProductsFromEBS et du json local
-    2) deleteEBSProducts delete les produits recup juste avant
-    3) postEBSProducts créer les nouveaux produits présent dans l'ESL exportJSON 
-    */
-
-    try {
-        resultOfExportJson = await getExportJsonFridge(fridgeId);
-    } catch (error) {
-        exit(1)
+    if(!currentPlanogram) {
+        exit(1);
     }
-    
-    fs.writeFileSync("./dataProducts.json", resultOfExportJson);
-    jsonDataProducts = JSON.parse(fs.readFileSync("./dataProducts.json"));
-    
-    console.log(JSON.stringify(jsonDataProducts));
-    console.log(JSON.stringify(resultEBS));
 
-    if (!_.isEqual(jsonDataProducts, resultEBS)) {
+    currentPlanogram.sort((a,b) => (a.ProductId > b.ProductId) ? 1 : ((b.ProductId > a.ProductId) ? -1 : 0));
+    resultEBS.sort((a,b) => (a.ProductId > b.ProductId) ? 1 : ((b.ProductId > a.ProductId) ? -1 : 0));
 
-        let i = 0;
-        let arraytmp = []
+    if (!_.isEqual(currentPlanogram, resultEBS)) {
+        const itemsAction = setAction(currentPlanogram, resultEBS);
 
-        while (typeof resultEBS !== 'undefined' && resultEBS.length > 0) { // en cas de bug de l'api delete 
-            for (const result of resultEBS) {
-                arraytmp[0] = result
-                
-                try {
-                    resultPost = await deleteEBSProducts(arraytmp)
-                } catch (error) {
-                    exit(1)
-                }
+        for (const item of itemsAction[0]) {
+            try {
+                await sleep(2000);
+                await httpRequest(urlEbsApi + item.ProductId, 'delete', null, aPiKeyEbs, null);
+            } catch (error) {
+                exit(1);
             }
-            resultEBS = await getProductsFromEBS()
         }
-        try {
-            resultPost = await postEBSProducts(resultOfExportJson)
-        } catch (error) {
-            exit(1)
+
+        for (const item of itemsAction[1] ) {
+            try {
+                await sleep(2000);
+                await httpRequest(urlEbsApi, 'post', [item], aPiKeyEbs, null);
+            } catch (error) {
+                exit(1);
+            }
         }
     } else {
         console.log("json équivalent pas besoin de mettre à jour");
     }
 }
 
-main()
+main();
+
+function httpRequest(url, method, data, headers, auth) {
+    return axios({
+        method: method,
+        url: url,
+        data: data,
+        headers: headers,
+        auth: auth,
+    })
+        .then((response) => response.data)
+        .catch((error) => console.log(error));
+}
+
+function setAction(currentPlanogram, resultEBS) {
+    let itemsAction = [];
+
+    //To delete
+    itemsAction[0] = resultEBS.filter((itemEbs) => {
+       const found = currentPlanogram.filter((itemPlano) => itemPlano.ProductId === itemEbs.ProductId);
+       return !found[0];
+    });
+
+    //TO post
+    itemsAction[1] = currentPlanogram.filter((itemPlano) => {
+        const found = resultEBS.filter((itemEbs) => itemPlano.ProductId === itemEbs.ProductId);
+
+        if(!found[0]) {
+            return true;
+        }
+
+        return !_.isEqual(itemPlano, found[0]);
+    });
+
+    return itemsAction;
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}

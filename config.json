@@ -1,7 +1,6 @@
 {
 	"rfridge": {
-		"api": "https://staging.rfridge.fr:8443/",
-		"config": "/home/pi/.config/rfridge.fridge/config.json"
+		"api": "https://staging.rfridge.fr:8443/"
 	},
 	"ebs": {
 		"api": "https://192.168.1.210/api/",
